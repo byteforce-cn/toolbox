@@ -1,0 +1,12 @@
+# Cargo 配置 —— 私有 Nexus registry 接入
+#
+# 凭据通过 cargo:token credential-provider 读取，
+# 流水线注入环境变量 CARGO_REGISTRIES_BYTEFORCE_PRIVATE_TOKEN（值形如 "Basic <base64>"）。
+# 不要把任何凭据写入本文件或仓库。
+
+[registries.byteforce-private]
+index = "sparse+https://nexus.byteforce.cn/repository/cargo-repo/"
+credential-provider = "cargo:token"
+
+[net]
+git-fetch-with-cli = true

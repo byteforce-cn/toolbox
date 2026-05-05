@@ -1,0 +1,57 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "app-config",
+  "description": "App-config-only fs access: Byteforce config dir and user skills dir",
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [
+        { "path": "$HOME/.byteforce/**" },
+        { "path": "$HOME/.jinhe/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [
+        { "path": "$HOME/.byteforce/**" },
+        { "path": "$HOME/.jinhe/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [
+        { "path": "$HOME/.byteforce/**" },
+        { "path": "$HOME/.jinhe/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [
+        { "path": "$HOME/.byteforce/**" },
+        { "path": "$HOME/.jinhe/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [
+        { "path": "$HOME/.byteforce/**" },
+        { "path": "$HOME/.jinhe/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-create",
+      "allow": [
+        { "path": "$HOME/.byteforce/**" },
+        { "path": "$HOME/.jinhe/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [
+        { "path": "$HOME/.byteforce/**" },
+        { "path": "$HOME/.jinhe/**" }
+      ]
+    }
+  ]
+}

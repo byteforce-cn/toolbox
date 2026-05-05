@@ -1,0 +1,37 @@
+[package]
+name = "toolbox"
+version = "0.1.0"
+description = "Byteforce Toolbox — AI-agent-driven developer workbench"
+authors = ["Byteforce"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "toolbox_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.6", features = [] }
+
+[dependencies]
+tauri = { version = "2.10.3", features = [] }
+tauri-plugin-opener = "2.3.5"
+tauri-plugin-fs = "2.3.3"
+tauri-plugin-dialog = "2.2.2"
+toolbox-plugin-crypto = { version = "0.1.0", registry = "byteforce-private" }
+toolbox-plugin-ai = { version = "0.1.0", registry = "byteforce-private" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.45", features = ["sync", "time"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+base64 = "0.22"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.26"
+objc = "0.2"
+block = "0.1"
+

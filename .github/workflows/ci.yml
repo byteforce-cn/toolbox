@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "public/toolbox/**"
+  pull_request:
+    paths:
+      - "public/toolbox/**"
+
+defaults:
+  run:
+    working-directory: public/toolbox
+
+jobs:
+  frontend:
+    name: Frontend (typecheck / test / build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: public/toolbox/.node-version
+
+      - name: Verify Node version
+        run: |
+          EXPECTED="22.19.0"
+          ACTUAL=$(node --version | sed 's/v//')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "Node version mismatch: expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10.8.1"
+          run_install: false
+
+      - name: Configure Nexus npm credentials
+        env:
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          AUTH=$(printf '%s:%s' "${NEXUS_USER}" "${NEXUS_PASSWORD}" | base64 | tr -d '\n')
+          echo "//nexus.byteforce.cn/repository/npm-private/:_auth=${AUTH}" >> "${HOME}/.npmrc"
+          echo "//nexus.byteforce.cn/repository/npm-private/:always-auth=true" >> "${HOME}/.npmrc"
+        working-directory: public/toolbox
+
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm exec tsc --noEmit
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Check SecretServiceStub not imported in production code
+        run: |
+          if grep -rn "secret-service-stub\|SecretServiceStub" src --include="*.ts" --include="*.tsx" | grep -v "secret-service-stub.ts"; then
+            echo "ERROR: SecretServiceStub imported in production code"
+            exit 1
+          fi
+
+  rust:
+    name: Rust (cargo test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Tauri)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            pkg-config
+
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal --component rustfmt clippy
+          rustup override set 1.93.0
+        working-directory: public/toolbox/src-tauri
+
+      - name: Verify Rust version
+        run: |
+          EXPECTED="1.93.0"
+          ACTUAL=$(rustc --version | awk '{print $2}')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "Rust version mismatch: expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+        working-directory: public/toolbox/src-tauri
+
+      - name: cargo fmt check
+        run: cargo fmt --check
+        working-directory: public/toolbox/src-tauri
+
+      - name: Configure Nexus cargo credentials
+        env:
+          NEXUS_USER: admin
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BASIC=$(printf '%s:%s' "${NEXUS_USER}" "${NEXUS_PASSWORD}" | base64 | tr -d '\n')
+          echo "CARGO_REGISTRIES_BYTEFORCE_PRIVATE_TOKEN=Basic ${BASIC}" >> "$GITHUB_ENV"
+        working-directory: public/toolbox/src-tauri
+
+      - name: cargo clippy
+        run: cargo clippy -- -D warnings
+        working-directory: public/toolbox/src-tauri
+
+      - name: cargo test
+        run: cargo test
+        working-directory: public/toolbox/src-tauri

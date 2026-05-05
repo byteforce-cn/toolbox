@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window — minimal fs permissions, file I/O routed through workspace broker",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "opener:default",
+    "dialog:default",
+    "dialog:allow-open",
+    "toolbox-plugin-crypto:allow-encrypt",
+    "toolbox-plugin-crypto:allow-decrypt",
+    "toolbox-plugin-ai:default"
+  ]
+}
