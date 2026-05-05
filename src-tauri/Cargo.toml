@@ -1,6 +1,6 @@
 [package]
 name = "toolbox"
-version = "0.1.0"
+version = "0.1.1"
 description = "Byteforce Toolbox — AI-agent-driven developer workbench"
 authors = ["Byteforce"]
 edition = "2021"
