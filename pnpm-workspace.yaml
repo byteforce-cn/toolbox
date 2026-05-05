@@ -1,3 +1,0 @@
-overrides:
-  '@byteforce/assistant': link:../../private/ts-libs/assistant
-  '@byteforce/shell': link:../../private/ts-libs/shell
