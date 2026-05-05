@@ -1,0 +1,134 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  # ── 多平台 Tauri 构建 ─────────────────────────────────────────────────────
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: '--target x86_64-pc-windows-msvc'
+          - platform: macos-x86_64
+            os: macos-13
+            target: x86_64-apple-darwin
+            args: '--target x86_64-apple-darwin'
+          - platform: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            args: '--target aarch64-apple-darwin'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10.8.1'
+          run_install: false
+
+      - name: Configure Nexus npm credentials (Unix)
+        if: runner.os != 'Windows'
+        env:
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          AUTH=$(printf '%s:%s' "${NEXUS_USER}" "${NEXUS_PASSWORD}" | base64 | tr -d '\n')
+          echo "//nexus.byteforce.cn/repository/npm-private/:_auth=${AUTH}" >> "${HOME}/.npmrc"
+          echo "//nexus.byteforce.cn/repository/npm-private/:always-auth=true" >> "${HOME}/.npmrc"
+
+      - name: Configure Nexus npm credentials (Windows)
+        if: runner.os == 'Windows'
+        env:
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        shell: pwsh
+        run: |
+          $auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${env:NEXUS_USER}:${env:NEXUS_PASSWORD}"))
+          Add-Content -Path "$env:USERPROFILE\.npmrc" -Value "//nexus.byteforce.cn/repository/npm-private/:_auth=$auth"
+          Add-Content -Path "$env:USERPROFILE\.npmrc" -Value "//nexus.byteforce.cn/repository/npm-private/:always-auth=true"
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust 1.93.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+          targets: ${{ matrix.target }}
+
+      - name: Configure Nexus Cargo credentials (Unix)
+        if: runner.os != 'Windows'
+        env:
+          NEXUS_USER: admin
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BASIC=$(printf '%s:%s' "${NEXUS_USER}" "${NEXUS_PASSWORD}" | base64 | tr -d '\n')
+          echo "CARGO_REGISTRIES_BYTEFORCE_PRIVATE_TOKEN=Basic ${BASIC}" >> "$GITHUB_ENV"
+
+      - name: Configure Nexus Cargo credentials (Windows)
+        if: runner.os == 'Windows'
+        env:
+          NEXUS_USER: admin
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        shell: pwsh
+        run: |
+          $basic = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${env:NEXUS_USER}:${env:NEXUS_PASSWORD}"))
+          Add-Content -Path "$env:GITHUB_ENV" -Value "CARGO_REGISTRIES_BYTEFORCE_PRIVATE_TOKEN=Basic $basic"
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            src-tauri/target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Extract changelog notes
+        id: changelog
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          if [[ -z "$NOTES" ]]; then
+            NOTES="请查阅 [CHANGELOG.md](CHANGELOG.md) 了解本次变更详情。"
+          fi
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and publish Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ github.ref_name }}
+          releaseBody: ${{ steps.changelog.outputs.notes }}
+          releaseDraft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          args: ${{ matrix.args }}

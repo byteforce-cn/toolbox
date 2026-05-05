@@ -3,15 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
-    paths:
-      - "public/toolbox/**"
   pull_request:
-    paths:
-      - "public/toolbox/**"
-
-defaults:
-  run:
-    working-directory: public/toolbox
 
 jobs:
   frontend:
@@ -24,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: public/toolbox/.node-version
+          node-version: '22.19.0'
 
       - name: Verify Node version
         run: |
@@ -50,7 +42,6 @@ jobs:
           AUTH=$(printf '%s:%s' "${NEXUS_USER}" "${NEXUS_PASSWORD}" | base64 | tr -d '\n')
           echo "//nexus.byteforce.cn/repository/npm-private/:_auth=${AUTH}" >> "${HOME}/.npmrc"
           echo "//nexus.byteforce.cn/repository/npm-private/:always-auth=true" >> "${HOME}/.npmrc"
-        working-directory: public/toolbox
 
       - name: Install dependencies (frozen lockfile)
         run: pnpm install --frozen-lockfile
@@ -93,7 +84,7 @@ jobs:
         run: |
           rustup toolchain install 1.93.0 --profile minimal --component rustfmt clippy
           rustup override set 1.93.0
-        working-directory: public/toolbox/src-tauri
+        working-directory: src-tauri
 
       - name: Verify Rust version
         run: |
@@ -103,11 +94,11 @@ jobs:
             echo "Rust version mismatch: expected $EXPECTED, got $ACTUAL"
             exit 1
           fi
-        working-directory: public/toolbox/src-tauri
+        working-directory: src-tauri
 
       - name: cargo fmt check
         run: cargo fmt --check
-        working-directory: public/toolbox/src-tauri
+        working-directory: src-tauri
 
       - name: Configure Nexus cargo credentials
         env:
@@ -117,12 +108,12 @@ jobs:
           set -euo pipefail
           BASIC=$(printf '%s:%s' "${NEXUS_USER}" "${NEXUS_PASSWORD}" | base64 | tr -d '\n')
           echo "CARGO_REGISTRIES_BYTEFORCE_PRIVATE_TOKEN=Basic ${BASIC}" >> "$GITHUB_ENV"
-        working-directory: public/toolbox/src-tauri
+        working-directory: src-tauri
 
       - name: cargo clippy
         run: cargo clippy -- -D warnings
-        working-directory: public/toolbox/src-tauri
+        working-directory: src-tauri
 
       - name: cargo test
         run: cargo test
-        working-directory: public/toolbox/src-tauri
+        working-directory: src-tauri
