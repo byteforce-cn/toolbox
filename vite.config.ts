@@ -6,8 +6,9 @@ const host = process.env.TAURI_DEV_HOST;
 
 
 
-export default defineConfig(async () => ({
+export default defineConfig(async ({ command }) => ({
   plugins: [react(), tailwindcss()],
+  base: command === "build" ? "./" : "/",
 
   resolve: {
     alias: {
