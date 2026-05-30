@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bot, Bug, Camera, Loader2 } from 'lucide-react';
+import { Bot, Bug, Camera, Loader2, Network } from 'lucide-react';
 import { useLayoutStore } from '@byteforce/shell';
 import {
   DropdownMenu,
@@ -57,6 +57,15 @@ export function TitleBarActions() {
               : <Camera className="size-3.5" />
             }
             复制对话截图
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => {
+              useLayoutStore.getState().setBottomPanelActiveTab('toolbox.agent-trace.panel');
+              useLayoutStore.getState().setBottomPanelOpen(true);
+            }}
+          >
+            <Network className="size-3.5" />
+            Agent 调用链路
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

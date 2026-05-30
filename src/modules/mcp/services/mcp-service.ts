@@ -34,6 +34,10 @@ export interface McpServerStatusDto {
   toolCount: number;
 }
 
+export interface McpAuthRequiredEvent {
+  serverId: string;
+}
+
 interface RawMcpServerConfig {
   id?: string;
   name?: string;
@@ -65,6 +69,11 @@ interface RawMcpServerStatusDto {
   toolCount?: number;
   tool_count?: number;
   error?: string | null;
+}
+
+interface RawMcpAuthRequiredEvent {
+  serverId?: string;
+  server_id?: string;
 }
 
 function normalizeTransport(value?: string): McpTransport {
@@ -211,3 +220,13 @@ export const onMcpStatusChanged = (
   listen('mcp-status-changed', () => handler()).then(
     (unlisten) => unlisten,
   );
+
+export const onMcpAuthRequired = (
+  handler: (event: McpAuthRequiredEvent) => void,
+): Promise<() => void> =>
+  listen<RawMcpAuthRequiredEvent>('mcp-auth-required', (event) => {
+    const payload = event.payload ?? {};
+    handler({
+      serverId: payload.serverId ?? payload.server_id ?? '',
+    });
+  }).then((unlisten) => unlisten);

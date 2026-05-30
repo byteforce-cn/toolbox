@@ -14,10 +14,11 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:local": "cp patch.toml Cargo.toml && tauri dev"
   },
   "dependencies": {
-    "@byteforce/assistant": "0.1.0",
+    "@byteforce/assistant": "0.1.4",
     "@byteforce/shell": "^0.1.0",
     "@monaco-editor/react": "4.7.0",
     "@tauri-apps/api": "2.11.0",

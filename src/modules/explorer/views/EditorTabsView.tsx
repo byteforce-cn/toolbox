@@ -30,6 +30,18 @@ export function EditorTabsView() {
     useFileBufferStore.getState().closeFile(id);
   }, []);
 
+  const handleCloseOthers = useCallback((id: string) => {
+    useFileBufferStore.getState().closeOthers(id);
+  }, []);
+
+  const handleCloseRight = useCallback((id: string) => {
+    useFileBufferStore.getState().closeRight(id);
+  }, []);
+
+  const handleCloseAll = useCallback(() => {
+    useFileBufferStore.getState().closeAll();
+  }, []);
+
   if (tabs.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -45,6 +57,9 @@ export function EditorTabsView() {
         activeTabId={activeTabPath}
         onSelectTab={handleSelectTab}
         onCloseTab={handleCloseTab}
+        onCloseOthers={handleCloseOthers}
+        onCloseRight={handleCloseRight}
+        onCloseAll={handleCloseAll}
       />
       <div className="min-h-0 flex-1 overflow-hidden">
         {activeTabPath && (

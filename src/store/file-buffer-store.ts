@@ -46,6 +46,9 @@ interface FileBufferState {
     aiReview?: FileBufferAiReviewContext,
   ): void;
   closeFile(path: string): void;
+  closeOthers(path: string): void;
+  closeRight(path: string): void;
+  closeAll(): void;
   setActiveTab(path: string): void;
 }
 
@@ -149,6 +152,36 @@ export const useFileBufferStore = create<FileBufferState>()((set) => ({
       }
       return { buffers, tabs, activeTabPath };
     });
+  },
+
+  closeOthers(path) {
+    set((state) => {
+      const tabs = [path];
+      const { [path]: kept, ...rest } = state.buffers;
+      void rest;
+      const buffers = kept ? { [path]: kept } : {};
+      return { tabs, activeTabPath: path, buffers };
+    });
+  },
+
+  closeRight(path) {
+    set((state) => {
+      const idx = state.tabs.indexOf(path);
+      if (idx === -1) return state;
+      const removed = state.tabs.slice(idx + 1);
+      const tabs = state.tabs.slice(0, idx + 1);
+      const buffers = { ...state.buffers };
+      for (const p of removed) delete buffers[p];
+      const activeTabPath =
+        state.activeTabPath && tabs.includes(state.activeTabPath)
+          ? state.activeTabPath
+          : path;
+      return { tabs, buffers, activeTabPath };
+    });
+  },
+
+  closeAll() {
+    set({ tabs: [], buffers: {}, activeTabPath: null });
   },
 
   setActiveTab(path) {

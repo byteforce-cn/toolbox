@@ -48,7 +48,13 @@ import { useWorkspaceStore } from '../../../store/workspace-store';
 import { useApprovalStore, type ApprovalRequest as WriteApprovalRequest } from '../../../store/approval-store';
 import { useChangesetStore, type Changeset, type ChangesetFile } from '../../../store/changeset-store';
 import { llmProviderList } from '../services/llm-provider-service';
-import { DEFAULT_ASSISTANT_RUNTIME_AGENT_ID, DEFAULT_ASSISTANT_AGENT_ID, agentListConfigs } from '../services/agent-service';
+import {
+  DEFAULT_ASSISTANT_RUNTIME_AGENT_ID,
+  DEFAULT_ASSISTANT_AGENT_ID,
+  agentListConfigs,
+  onAgentMessageFeedback,
+  onCostSnapshotUpdated,
+} from '../services/agent-service';
 import * as teamService from '../../agent-team/services/team-service';
 import type { TeamDto } from '../../agent-team/services/team-service';
 import {
@@ -182,6 +188,30 @@ export function AIAssistantView() {
     setCurrentSession(activeConversationId);
     return () => setCurrentSession(null);
   }, [activeConversationId, setCurrentSession]);
+
+  useEffect(() => {
+    let unlistenFeedback: (() => void) | undefined;
+    let unlistenCost: (() => void) | undefined;
+
+    void onAgentMessageFeedback((event) => {
+      if (event.aiSessionId && event.aiSessionId !== activeConversationId) return;
+      void loadSessionSummaries();
+    }).then((dispose) => {
+      unlistenFeedback = dispose;
+    });
+
+    void onCostSnapshotUpdated((event) => {
+      if (event.sessionId && event.sessionId !== activeConversationId) return;
+      void loadSessionSummaries();
+    }).then((dispose) => {
+      unlistenCost = dispose;
+    });
+
+    return () => {
+      unlistenFeedback?.();
+      unlistenCost?.();
+    };
+  }, [activeConversationId, loadSessionSummaries]);
 
   const reloadTeams = useCallback(async () => {
     try {

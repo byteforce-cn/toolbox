@@ -2,6 +2,7 @@
  * file-context-builder.ts — 文件上下文构建工具。
  * 基于 draft/jinhe 精简适配，使用 toolbox FileBuffer 接口。
  */
+import { invoke } from '@tauri-apps/api/core';
 import type { FileBuffer } from '../../../store/file-buffer-store';
 import { invokeAI } from '../services/invoke-ai';
 
@@ -68,6 +69,60 @@ export async function buildFileTreeContext(rootPath: string | null): Promise<str
     if (!tree?.trim()) return '';
     const name = rootPath.split('/').pop() ?? rootPath;
     return `## 项目文件结构\n\n\`\`\`\n${name}/\n${tree}\`\`\`\n`;
+  } catch {
+    return '';
+  }
+}
+
+interface DirEntry { path: string; name: string; is_directory: boolean }
+
+/**
+ * 读取 `{rootPath}/.claude/memory/` 目录下所有 `.md` 文件并注入为系统 prompt 约束块。
+ *
+ * - 按文件名排序，最多读取 20 个文件，每个文件 token 超 800 时截断。
+ * - 文件或目录不存在时静默返回空字符串，不影响 agent 启动。
+ * - 使用 workspace broker 读取（不调用 navigator.clipboard 等 Web API）。
+ */
+export async function buildMemoryContext(
+  rootPath: string | null,
+  workspaceId: string,
+): Promise<string> {
+  if (!rootPath || !workspaceId) return '';
+  const memDir = `${rootPath}/.claude/memory`;
+  try {
+    const entries = await invoke<DirEntry[]>('workspace_read_dir', {
+      workspaceId,
+      path: memDir,
+    });
+    const mdFiles = entries
+      .filter((e) => !e.is_directory && e.name.toLowerCase().endsWith('.md'))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, 20);
+    if (mdFiles.length === 0) return '';
+
+    const MAX_FILE_TOKENS = 800;
+    const parts: string[] = ['## 项目记忆与约束（.claude/memory）\n'];
+    for (const file of mdFiles) {
+      try {
+        const raw = await invoke<string>('workspace_read_text_file', {
+          workspaceId,
+          path: file.path,
+        });
+        if (!raw?.trim()) continue;
+        const body =
+          estimateTokens(raw) <= MAX_FILE_TOKENS
+            ? raw.trim()
+            : raw
+                .split('\n')
+                .slice(0, 60)
+                .join('\n')
+                .trim() + '\n...(截断)';
+        parts.push(`### ${file.name}\n${body}\n`);
+      } catch {
+        // 单文件读取失败不影响其他文件
+      }
+    }
+    return parts.length > 1 ? parts.join('\n') : '';
   } catch {
     return '';
   }

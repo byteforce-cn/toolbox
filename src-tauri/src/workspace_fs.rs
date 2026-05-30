@@ -329,6 +329,79 @@ pub fn workspace_exists(
     Ok(target.exists())
 }
 
+/// 从 workspace 外部复制文件到 workspace 内指定目录。
+/// 场景：从系统剪贴板粘贴 VSCode / Finder 复制的文件。
+///
+/// 安全校验：
+/// - dest_dir_absolute 必须在已注册的 workspace root 内
+/// - 源路径通过 deny_sensitive 检查，拒绝凭据/系统敏感目录
+/// - 自动处理文件名冲突（追加 _copy、_copy2 … _copy99）
+/// - 仅支持单文件；不递归复制目录
+/// - 返回写入后目标文件的绝对路径
+#[tauri::command]
+pub fn workspace_copy_external_file(
+    workspace_id: String,
+    src_absolute: String,
+    dest_dir_absolute: String,
+    state: tauri::State<WorkspaceBrokerState>,
+) -> Result<String, String> {
+    let root = get_workspace_root(&workspace_id, &state)?;
+
+    // ① 源路径：不要求在 workspace 内，但不能是敏感路径
+    let src = canonicalize_strict(&src_absolute)?;
+    deny_sensitive(&src)?;
+    if !src.is_file() {
+        return Err(format!("源路径不是文件: {}", src.display()));
+    }
+
+    // ② 目标目录：必须在 workspace 内
+    let dest_dir = canonicalize_strict(&dest_dir_absolute)?;
+    assert_within_workspace(&root, &dest_dir)?;
+    if !dest_dir.is_dir() {
+        return Err(format!("目标路径不是目录: {}", dest_dir.display()));
+    }
+
+    // ③ 解析无冲突文件名
+    let file_name = src
+        .file_name()
+        .ok_or_else(|| "源路径无文件名".to_string())?
+        .to_string_lossy()
+        .into_owned();
+    let dest_path = resolve_non_conflicting_dest(&dest_dir, &file_name)?;
+
+    // ④ 复制
+    std::fs::copy(&src, &dest_path).map_err(|e| format!("复制失败: {e}"))?;
+
+    Ok(dest_path.to_string_lossy().into_owned())
+}
+
+/// 生成无冲突目标路径：若目标文件已存在，追加 _copy、_copy2 … _copy99 后缀。
+fn resolve_non_conflicting_dest(dir: &Path, file_name: &str) -> Result<PathBuf, String> {
+    let candidate = dir.join(file_name);
+    if !candidate.exists() {
+        return Ok(candidate);
+    }
+
+    let path = Path::new(file_name);
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or(file_name);
+    let ext = path.extension().and_then(|s| s.to_str());
+
+    for i in 1u32..=99 {
+        let new_name = match ext {
+            Some(e) if i == 1 => format!("{stem}_copy.{e}"),
+            Some(e) => format!("{stem}_copy{i}.{e}"),
+            None if i == 1 => format!("{stem}_copy"),
+            None => format!("{stem}_copy{i}"),
+        };
+        let candidate = dir.join(&new_name);
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err("无法生成无冲突文件名（已存在 99 个副本）".to_string())
+}
+
 // ── Unit tests ─────────────────────────────────────────────────────────────
 
 #[cfg(test)]

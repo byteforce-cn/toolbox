@@ -9,6 +9,7 @@ import type {
   AgentRealtimeEnvelope,
   AgentInstance,
   AgentRunRequest,
+  CostUpdateData,
   AgentSessionHistory,
   AgentSessionSummary,
   ProposalApplyRequest,
@@ -32,6 +33,10 @@ export const isInternalRuntimeAgentId = (agentId: string): boolean =>
 
 export const agentGetDefaultSystemPrompt = (): Promise<string> =>
   invokeAI<string>('agent_get_default_system_prompt');
+
+/** 列出后端注册的所有 prompt 资源（资源名 -> Markdown 内容）。 */
+export const agentListPromptResources = (): Promise<Record<string, string>> =>
+  invokeAI<Record<string, string>>('agent_list_prompt_resources');
 
 export const agentListConfigs = (): Promise<AgentConfig[]> =>
   invokeAI<AgentConfig[]>('agent_list_configs');
@@ -69,6 +74,47 @@ export const agentGetSessionHistory = (aiSessionId: string): Promise<AgentSessio
 
 export const listenAgentRealtimeEvent = (cb: (event: AgentRealtimeEnvelope) => void): Promise<() => void> =>
   listen<AgentRealtimeEnvelope>(AGENT_REALTIME_EVENT_CHANNEL, (e) => cb(e.payload));
+
+export interface AgentMessageFeedbackEvent {
+  aiSessionId: string;
+  action: 'helpful' | 'unhelpful' | 'clear' | string;
+  detail?: string;
+}
+
+export interface AgentCostSnapshotUpdatedEvent {
+  sessionId: string;
+  modelUsage?: Record<string, CostUpdateData>;
+  totalCostUsd?: number;
+}
+
+export const onAgentMessageFeedback = (
+  handler: (event: AgentMessageFeedbackEvent) => void,
+): Promise<() => void> =>
+  listen<Record<string, unknown>>('agent-message-feedback', (event) => {
+    const payload = (event.payload ?? {}) as Record<string, unknown>;
+    handler({
+      aiSessionId: String(payload.aiSessionId ?? payload.ai_session_id ?? ''),
+      action: String(payload.action ?? ''),
+      detail: payload.detail == null ? undefined : String(payload.detail),
+    });
+  }).then((unlisten) => unlisten);
+
+export const onCostSnapshotUpdated = (
+  handler: (event: AgentCostSnapshotUpdatedEvent) => void,
+): Promise<() => void> =>
+  listen<Record<string, unknown>>('cost-snapshot-updated', (event) => {
+    const payload = (event.payload ?? {}) as Record<string, unknown>;
+    handler({
+      sessionId: String(payload.sessionId ?? payload.session_id ?? ''),
+      modelUsage: payload.modelUsage as Record<string, CostUpdateData> | undefined,
+      totalCostUsd:
+        typeof payload.totalCostUsd === 'number'
+          ? payload.totalCostUsd
+          : typeof payload.total_cost_usd === 'number'
+            ? payload.total_cost_usd
+            : undefined,
+    });
+  }).then((unlisten) => unlisten);
 
 // ── Proposals ─────────────────────────────────────────────────────────────
 

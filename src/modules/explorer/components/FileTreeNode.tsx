@@ -19,6 +19,77 @@ import type { FileNode } from '../store/types';
 import { useExplorerNodeDecorations } from '../hooks/useExplorerNodeDecorations';
 import { buildGitDecorationBadges } from '../utils/git-decoration';
 
+/**
+ * Pointer-based drag state.
+ *
+ * Using HTML5 drag-and-drop API (`draggable` attribute) in Tauri/WKWebView on
+ * macOS triggers a *native* OS drag session.  If the drag ends outside the
+ * WebView window the `dragend` event may never fire, which freezes all mouse
+ * events system-wide until the stuck session is cleared.  We avoid this by
+ * using Pointer Events + setPointerCapture instead, which stays entirely
+ * within the WebView and never starts a native drag session.
+ */
+interface PointerDragState {
+  sourcePath: string;
+  sourceName: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  active: boolean;
+  preview: HTMLDivElement | null;
+  currentTargetEl: HTMLElement | null;
+}
+let _pd: PointerDragState | null = null;
+const DRAG_THRESHOLD = 4;
+
+function _createPreview(label: string): HTMLDivElement {
+  const el = document.createElement('div');
+  el.style.cssText =
+    'position:fixed;pointer-events:none;z-index:9999;padding:1px 8px;' +
+    'background:hsl(var(--background));border:1px solid hsl(var(--border));' +
+    'border-radius:4px;font-size:12px;color:hsl(var(--foreground));' +
+    'white-space:nowrap;opacity:0.9;box-shadow:0 2px 8px rgba(0,0,0,.2);';
+  el.textContent = label;
+  document.body.appendChild(el);
+  return el;
+}
+
+function _setDropHighlight(el: HTMLElement | null) {
+  if (_pd?.currentTargetEl && _pd.currentTargetEl !== el) {
+    _pd.currentTargetEl.style.outline = '';
+    _pd.currentTargetEl.style.backgroundColor = '';
+  }
+  if (el) {
+    el.style.outline = '1px solid hsl(var(--primary) / 0.5)';
+    el.style.outlineOffset = '-1px';
+    el.style.backgroundColor = 'hsl(var(--primary) / 0.08)';
+  }
+  if (_pd) _pd.currentTargetEl = el;
+}
+
+function _findDropTarget(x: number, y: number): HTMLElement | null {
+  const preview = _pd?.preview;
+  if (preview) preview.style.display = 'none';
+  let el = document.elementFromPoint(x, y) as HTMLElement | null;
+  while (el && !el.dataset.explorerDir) el = el.parentElement;
+  if (preview) preview.style.display = '';
+  return el;
+}
+
+function _endDrag(onMove?: (src: string, tgt: string) => void, x?: number, y?: number) {
+  if (!_pd) return;
+  _setDropHighlight(null);
+  if (_pd.preview) document.body.removeChild(_pd.preview);
+  if (_pd.active && onMove && x !== undefined && y !== undefined) {
+    const targetEl = _findDropTarget(x, y);
+    const targetPath = targetEl?.dataset.explorerDir;
+    if (targetPath && targetPath !== _pd.sourcePath) {
+      onMove(_pd.sourcePath, targetPath);
+    }
+  }
+  _pd = null;
+}
+
 interface FileTreeNodeProps {
   node: FileNode;
   depth: number;
@@ -35,6 +106,15 @@ interface FileTreeNodeProps {
   onNewFolder: (parentPath: string) => void;
   onCopyPath: (path: string) => void;
   onOpenInSystemExplorer: (path: string) => void;
+  onMove: (sourcePath: string, targetDirPath: string) => void;
+  /** 将文件/目录复制到系统剪贴板（可粘贴到 Finder/VSCode） */
+  onCopyFile?: (path: string) => void;
+  /** 剪贴板中是否有可粘贴的外部文件 */
+  clipboardHasPaste?: boolean;
+  /** 粘贴外部文件到指定目录 */
+  onPasteToDir?: (destDirAbsolute: string) => void;
+  /** 右键菜单打开时主动刷新剪贴板状态 */
+  onCheckClipboard?: () => void;
 }
 
 export function FileTreeNode({
@@ -53,6 +133,11 @@ export function FileTreeNode({
   onNewFolder,
   onCopyPath,
   onOpenInSystemExplorer,
+  onMove,
+  onCopyFile,
+  clipboardHasPaste = false,
+  onPasteToDir,
+  onCheckClipboard,
 }: FileTreeNodeProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const decorations = useExplorerNodeDecorations(node.path, node.kind);
@@ -97,6 +182,61 @@ export function FileTreeNode({
     setIsRenaming(false);
     onRename(node.path, newName);
   };
+
+  // --- Pointer-based drag (avoids native macOS drag session) ----------------
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (isVirtualNode || e.button !== 0) return;
+      _pd = {
+        sourcePath: node.path,
+        sourceName: node.name,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        active: false,
+        preview: null,
+        currentTargetEl: null,
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    [isVirtualNode, node.path, node.name],
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!_pd || _pd.sourcePath !== node.path) return;
+      const dx = e.clientX - _pd.startX;
+      const dy = e.clientY - _pd.startY;
+      if (!_pd.active) {
+        if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
+        _pd.active = true;
+        _pd.preview = _createPreview(_pd.sourceName);
+      }
+      const p = _pd.preview!;
+      p.style.left = `${e.clientX + 14}px`;
+      p.style.top = `${e.clientY - 10}px`;
+      const targetEl = _findDropTarget(e.clientX, e.clientY);
+      const targetPath = targetEl?.dataset.explorerDir;
+      _setDropHighlight(
+        targetPath && targetPath !== _pd.sourcePath ? targetEl : null,
+      );
+    },
+    [node.path],
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (!_pd || _pd.sourcePath !== node.path) return;
+      _endDrag(onMove, e.clientX, e.clientY);
+    },
+    [node.path, onMove],
+  );
+
+  const handlePointerCancel = useCallback(() => {
+    if (!_pd || _pd.sourcePath !== node.path) return;
+    _endDrag();
+  }, [node.path]);
+  // --------------------------------------------------------------------------
 
   const indentStyle = { paddingLeft: `${depth * 12 + 4}px` };
 
@@ -181,15 +321,20 @@ export function FileTreeNode({
   ].filter((badge): badge is NonNullable<typeof badge> => badge !== null);
 
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={(open) => { if (open) onCheckClipboard?.(); }}>
       <ContextMenuTrigger asChild>
         <div
           role="treeitem"
           aria-selected={isSelected}
           aria-expanded={node.kind === 'dir' ? isExpanded : undefined}
           tabIndex={0}
+          data-explorer-dir={node.kind === 'dir' ? node.path : undefined}
           onClick={handleClick}
           onKeyDown={handleKeyDown}
+          onPointerDown={!isVirtualNode ? handlePointerDown : undefined}
+          onPointerMove={!isVirtualNode ? handlePointerMove : undefined}
+          onPointerUp={!isVirtualNode ? handlePointerUp : undefined}
+          onPointerCancel={!isVirtualNode ? handlePointerCancel : undefined}
           style={indentStyle}
           className={cn(
             'group flex h-6 cursor-pointer select-none items-center gap-1 rounded-sm pr-2 text-sm outline-none',
@@ -277,6 +422,23 @@ export function FileTreeNode({
         )}
         {(!isVirtualNode || (isDraftVirtualNode && node.kind === 'dir')) && (
           <ContextMenuSeparator />
+        )}
+        {/* 复制文件/目录到系统剪贴板 */}
+        {onCopyFile && !isVirtualNode && (
+          <>
+            <ContextMenuItem onClick={() => onCopyFile(node.path)}>复制</ContextMenuItem>
+          </>
+        )}
+        {/* 剪贴板有外部文件时，在目录节点显示粘贴项 */}
+        {clipboardHasPaste && onPasteToDir && node.kind === 'dir' && !isVirtualNode && (
+          <>
+            <ContextMenuItem
+              onClick={() => onPasteToDir(node.path)}
+            >
+              粘贴
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
         )}
         {canOpenReview && (
           <>

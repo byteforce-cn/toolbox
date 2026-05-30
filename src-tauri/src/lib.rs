@@ -1,3 +1,4 @@
+mod clipboard;
 mod git;
 mod lifecycle;
 mod screenshot;
@@ -41,7 +42,11 @@ pub fn run() {
             workspace_fs::workspace_rename,
             workspace_fs::workspace_remove,
             workspace_fs::workspace_exists,
+        workspace_fs::workspace_copy_external_file,
         screenshot::copy_element_screenshot,
+        clipboard::clipboard_read_file_paths,
+        clipboard::clipboard_write_file_paths,
+        clipboard::clipboard_read_text,
         ])
         .setup(|app| {
             setup_windows(app)?;
@@ -91,6 +96,8 @@ fn setup_windows(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     {
         if let Some(window) = app.get_webview_window("main") {
             platform::mac::setup_mac_window(&window);
+            // 阻止 macOS Ventura+ WKWebView 弹出原生 "Paste" 气泡（覆盖右键菜单）
+            platform::mac::suppress_paste_callout(&window);
         }
     }
 

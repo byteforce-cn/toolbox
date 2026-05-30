@@ -147,5 +147,18 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Prevent native macOS WKWebView Paste/Copy/Look-up callout on right-click.
+       -webkit-touch-callout suppresses the WKTextInteractionController callout
+       (the floating "Paste" bubble); -webkit-user-select: none prevents text
+       selection handles that also trigger the callout. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
   }
 }

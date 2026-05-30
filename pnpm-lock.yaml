@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@byteforce/assistant':
-        specifier: 0.1.0
-        version: 0.1.0(@types/react@19.1.8)(immer@11.0.0)(lucide-react@0.525.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+        specifier: 0.1.4
+        version: 0.1.4(@types/react@19.1.8)(immer@11.0.0)(lucide-react@0.525.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
       '@byteforce/shell':
         specifier: ^0.1.0
-        version: 0.1.0(@types/react@19.1.8)(immer@11.0.0)(lucide-react@0.525.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
+        version: 0.1.0(@types/react-dom@19.1.6(@types/react@19.1.8))(@types/react@19.1.8)(immer@11.0.0)(lucide-react@0.525.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
       '@monaco-editor/react':
         specifier: 4.7.0
         version: 4.7.0(monaco-editor@0.52.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -246,15 +246,15 @@ packages:
     resolution: {integrity: sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A==}
     engines: {node: '>=6.9.0'}
 
-  '@byteforce/assistant@0.1.0':
-    resolution: {integrity: sha512-y2vdkcz7FTr4xiAry9cyY2vKx9CB/6yPfk52A1DeiJ1D1MFqA1ZI2TJouR1c5T0IUPIoeu+zmtUl7TtHNQsTyg==}
+  '@byteforce/assistant@0.1.4':
+    resolution: {integrity: sha512-7lpWIppSpknI94nTtaO/z8slOSoBQB5y/xih/3eDPeFNJjysWhTesK2oWQCQ52HAe9Bjo6kC72bKq++BVmKdsA==}
     peerDependencies:
       lucide-react: '>=0.400.0'
       react: 19.2.0
       react-dom: 19.2.0
 
   '@byteforce/shell@0.1.0':
-    resolution: {integrity: sha512-5LzwIzjj4U81YdF/jLVFK2/RFGVCIWp22q9ChOpL2D12/hNQxz2jBdHcsu9S4rlEK2AfxhIRqW+k1+QGz+/+SQ==}
+    resolution: {integrity: sha512-wNY6VsjMj3zzP2oq9ePTutuG44XHUr0Fv2RnkqIwmmAseCaAKbJ0CBiBkLvGVrEbYdCVEnh8207ybTxseqwGZQ==}
     peerDependencies:
       lucide-react: '>=0.400.0'
       react: 19.2.0
@@ -3923,7 +3923,7 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@byteforce/assistant@0.1.0(@types/react@19.1.8)(immer@11.0.0)(lucide-react@0.525.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
+  '@byteforce/assistant@0.1.4(@types/react@19.1.8)(immer@11.0.0)(lucide-react@0.525.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
     dependencies:
       clsx: 2.1.1
       lucide-react: 0.525.0(react@19.2.0)
@@ -3940,16 +3940,18 @@ snapshots:
       - supports-color
       - use-sync-external-store
 
-  '@byteforce/shell@0.1.0(@types/react@19.1.8)(immer@11.0.0)(lucide-react@0.525.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
+  '@byteforce/shell@0.1.0(@types/react-dom@19.1.6(@types/react@19.1.8))(@types/react@19.1.8)(immer@11.0.0)(lucide-react@0.525.0(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))':
     dependencies:
       clsx: 2.1.1
       lucide-react: 0.525.0(react@19.2.0)
+      radix-ui: 1.4.3(@types/react-dom@19.1.6(@types/react@19.1.8))(@types/react@19.1.8)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       react: 19.2.0
       react-dom: 19.2.0(react@19.2.0)
       tailwind-merge: 3.5.0
       zustand: 5.0.5(@types/react@19.1.8)(immer@11.0.0)(react@19.2.0)(use-sync-external-store@1.6.0(react@19.2.0))
     transitivePeerDependencies:
       - '@types/react'
+      - '@types/react-dom'
       - immer
       - use-sync-external-store
 

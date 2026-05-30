@@ -3,7 +3,7 @@ import { useExplorerStore } from './store/explorer-store';
 import { useWorkspaceStore } from '../../store/workspace-store';
 import type { FileNode } from './store/types';
 import { batchRefreshTargets } from './utils/refresh-targets';
-import { dirname, sortNodes, updateNode } from './utils/file-utils';
+import { basename, dirname, sortNodes, updateNode } from './utils/file-utils';
 
 function buildNodes(
   entries: Array<{ path: string; name: string; isDirectory: boolean }>,
@@ -173,6 +173,20 @@ export async function renameExplorerNode(oldPath: string, newPath: string): Prom
   await refreshExplorer(parentPath || (useExplorerStore.getState().rootPath ?? undefined));
 }
 
+export async function moveExplorerNode(sourcePath: string, targetDirPath: string): Promise<void> {
+  // Guard: prevent moving into self or a descendant of the source
+  if (isSameOrDescendantPath(targetDirPath, sourcePath)) return;
+  const name = basename(sourcePath);
+  const newPath = `${targetDirPath}/${name}`;
+  // Guard: already lives in that directory
+  if (newPath === sourcePath) return;
+  await tauriFsService.rename(getWorkspaceId(), sourcePath, newPath);
+  const sourceParent = dirname(sourcePath);
+  // Refresh both affected directories (dedup when they are the same)
+  const targets = sourceParent === targetDirPath ? [targetDirPath] : [sourceParent, targetDirPath];
+  await refreshExplorer(targets);
+}
+
 export async function deleteExplorerNode(path: string): Promise<void> {
   const state = useExplorerStore.getState();
   // 找到节点以判断是否为目录
@@ -195,6 +209,29 @@ export async function deleteExplorerNode(path: string): Promise<void> {
   if (useExplorerStore.getState().selectedPath === path) {
     useExplorerStore.getState().selectNode(null);
   }
+}
+
+/**
+ * 将系统剪贴板中的外部文件（VSCode / Finder Cmd+C）粘贴到资源管理器指定目录。
+ *
+ * @param destDirAbsolute 目标目录绝对路径（必须在 workspace 内）
+ * @param srcPaths        源文件绝对路径列表（从系统剪贴板读取）
+ * @returns 成功复制的目标文件路径列表
+ */
+export async function pasteExternalFilesToDir(
+  destDirAbsolute: string,
+  srcPaths: string[],
+): Promise<string[]> {
+  const wsId = getWorkspaceId();
+  const results: string[] = [];
+
+  for (const src of srcPaths) {
+    const destPath = await tauriFsService.copyExternalFile(wsId, src, destDirAbsolute);
+    results.push(destPath);
+  }
+
+  await refreshExplorer(destDirAbsolute);
+  return results;
 }
 
 export { isSameOrDescendantPath };

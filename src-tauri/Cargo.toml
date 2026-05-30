@@ -22,8 +22,8 @@ tauri = { version = "2.10.3", features = [] }
 tauri-plugin-opener = "2.3.5"
 tauri-plugin-fs = "2.3.3"
 tauri-plugin-dialog = "2.2.2"
-toolbox-plugin-crypto = { version = "0.1.0", registry = "byteforce-private" }
-toolbox-plugin-ai = { version = "0.1.0", registry = "byteforce-private" }
+toolbox-plugin-crypto = { version = "0.1.1", registry = "byteforce-private" }
+toolbox-plugin-ai = { version = "0.1.1", registry = "byteforce-private" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.45", features = ["sync", "time"] }
@@ -34,4 +34,19 @@ base64 = "0.22"
 cocoa = "0.26"
 objc = "0.2"
 block = "0.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58.0", features = [
+    "Win32_Foundation",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+    "Win32_UI_Shell",
+] }
+
+# 本地开发路径覆盖：使用 private/rust-libs/toolbox 本地源码替代 registry 版本
+# 本地开发时，[patch] 通过父级 Cargo.toml（由 pnpm tauri:local 生成）注入，无需在此文件修改
+# 发布构建时 CI 直接使用此文件，不存在父级 workspace，走 registry 版本
+# [patch."sparse+https://nexus.byteforce.cn/repository/cargo-repo/"]
+# toolbox-plugin-crypto = { path = "../../../private/rust-libs/toolbox/toolbox-plugin-crypto" }
+# toolbox-plugin-ai = { path = "../../../private/rust-libs/toolbox/toolbox-plugin-ai" }
 

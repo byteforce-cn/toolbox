@@ -74,6 +74,26 @@ export class TauriFsService {
   async exists(workspaceId: string, path: string): Promise<boolean> {
     return invoke<boolean>('workspace_exists', { workspaceId, path });
   }
+
+  /**
+   * 从 workspace 外部复制单个文件到 workspace 内目标目录。
+   * 场景：VSCode / Finder Cmd+C 复制文件后，在资源管理器 Cmd+V 粘贴。
+   *
+   * @param srcAbsolute     源文件绝对路径（workspace 外部）
+   * @param destDirAbsolute 目标目录绝对路径（workspace 内）
+   * @returns 实际写入的目标文件绝对路径（有冲突时自动追加 _copy 后缀）
+   */
+  async copyExternalFile(
+    workspaceId: string,
+    srcAbsolute: string,
+    destDirAbsolute: string,
+  ): Promise<string> {
+    return invoke<string>('workspace_copy_external_file', {
+      workspaceId,
+      srcAbsolute,
+      destDirAbsolute,
+    });
+  }
 }
 
 export const tauriFsService = new TauriFsService();

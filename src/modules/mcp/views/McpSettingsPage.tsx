@@ -159,11 +159,25 @@ export function McpSettingsPage() {
 
   useEffect(() => {
     void reload();
-    let unlisten: (() => void) | undefined;
+    let unlistenStatus: (() => void) | undefined;
+    let unlistenAuth: (() => void) | undefined;
     void mcpService.onMcpStatusChanged(() => void reload()).then((dispose) => {
-      unlisten = dispose;
+      unlistenStatus = dispose;
     });
-    return () => unlisten?.();
+    void mcpService.onMcpAuthRequired(({ serverId }) => {
+      setError(
+        serverId
+          ? `MCP 服务 ${serverId} 需要认证，请填写 Auth Token 后重试。`
+          : 'MCP 服务需要认证，请填写 Auth Token 后重试。',
+      );
+      void reload();
+    }).then((dispose) => {
+      unlistenAuth = dispose;
+    });
+    return () => {
+      unlistenStatus?.();
+      unlistenAuth?.();
+    };
   }, [reload]);
 
   const handleAdd = useCallback(() => {

@@ -6,7 +6,7 @@
  *           agent_get_default_system_prompt（全部已注册）。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, Loader2, Pencil, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react';
+import { Bot, Loader2, Pencil, Plus, RotateCcw, Save, Trash2, X, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import * as agentService from '../../ai-assistant/services/agent-service';
 import * as llmProviderService from '../../ai-assistant/services/llm-provider-service';
 import type { AgentConfig } from '../../ai-assistant/services/types';
@@ -275,7 +275,6 @@ export function AgentSettingsPage() {
         ))}
       </div>
 
-      {/* 编辑表单 */}
       {editing && (
         <div className="rounded-lg border bg-card p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -437,6 +436,8 @@ export function AgentSettingsPage() {
           </div>
         </div>
       )}
+
+      <PromptResourcesPanel />
     </div>
   );
 }
@@ -457,6 +458,124 @@ function Field({
       <label className="mb-1 block text-[11px] font-medium text-foreground">{label}</label>
       {children}
       {hint && <p className="mt-0.5 text-[10px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * PromptResourcesPanel — 只读浏览后端注册的 prompt 资源
+ * （`agent_list_prompt_resources` 返回的 name -> Markdown 内容）。
+ */
+function PromptResourcesPanel() {
+  const [resources, setResources] = useState<Record<string, string> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await agentService.agentListPromptResources();
+      setResources(data);
+      const keys = Object.keys(data);
+      if (keys.length > 0 && (selected == null || !keys.includes(selected))) {
+        setSelected(keys[0]);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [selected]);
+
+  useEffect(() => {
+    if (expanded && resources == null && !loading) {
+      void load();
+    }
+  }, [expanded, resources, loading, load]);
+
+  const names = useMemo(() => (resources ? Object.keys(resources).sort() : []), [resources]);
+  const content = selected && resources ? resources[selected] : '';
+
+  return (
+    <div className="rounded-lg border bg-card">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <h2 className="text-sm font-medium text-foreground">Prompt 资源</h2>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              内置 / 插件注册的提示词资源（只读，供编写 Agent System Prompt 时参考）。
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {resources && (
+            <span className="text-[11px]">{names.length} 项</span>
+          )}
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t px-4 py-3">
+          <div className="mb-2 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={loading}
+              className="flex h-6 items-center gap-1 rounded-md border px-2 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              {loading ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RotateCcw className="h-3 w-3" />
+              )}
+              刷新
+            </button>
+          </div>
+
+          {error && (
+            <div className="mb-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+              {error}
+            </div>
+          )}
+
+          {!loading && resources && names.length === 0 && (
+            <div className="rounded-md border border-dashed px-3 py-4 text-center text-[12px] text-muted-foreground">
+              当前没有任何 prompt 资源。
+            </div>
+          )}
+
+          {resources && names.length > 0 && (
+            <div className="grid grid-cols-[200px_1fr] gap-3">
+              <div className="max-h-72 overflow-y-auto rounded-md border bg-background">
+                {names.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => setSelected(name)}
+                    className={`flex w-full items-center px-2 py-1.5 text-left text-[12px] hover:bg-muted ${
+                      selected === name ? 'bg-muted text-foreground' : 'text-muted-foreground'
+                    }`}
+                  >
+                    <span className="truncate font-mono">{name}</span>
+                  </button>
+                ))}
+              </div>
+              <pre className="max-h-72 overflow-auto rounded-md border bg-background px-3 py-2 text-[11px] font-mono leading-relaxed text-foreground whitespace-pre-wrap">
+                {content || '（空）'}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

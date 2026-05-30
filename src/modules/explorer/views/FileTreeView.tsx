@@ -11,6 +11,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from '../../../components/ui/context-menu';
 import type { FileNode } from '../store/types';
@@ -19,6 +20,7 @@ import {
   createExplorerFile,
   createExplorerDir,
   renameExplorerNode,
+  moveExplorerNode,
   toggleExplorerExpand,
 } from '../explorer-controller';
 
@@ -60,6 +62,14 @@ interface FileTreeViewProps {
   pendingNewAtRoot?: 'file' | 'dir' | null;
   pendingNewParent?: string | null;
   onPendingNewAtRootDone?: () => void;
+  /** 剪贴板中是否有可粘贴的外部文件（从 VSCode/Finder 复制） */
+  clipboardHasPaste?: boolean;
+  /** 粘贴外部文件到指定目录 */
+  onPasteToDir?: (destDirAbsolute: string) => void;
+  /** 右键菜单打开时主动刷新剪贴板状态 */
+  onCheckClipboard?: () => void;
+  /** 将文件/目录复制到系统剪贴板 */
+  onCopyFile?: (path: string) => void;
 }
 
 export function FileTreeView({
@@ -71,6 +81,10 @@ export function FileTreeView({
   pendingNewAtRoot,
   pendingNewParent,
   onPendingNewAtRootDone,
+  clipboardHasPaste = false,
+  onPasteToDir,
+  onCheckClipboard,
+  onCopyFile,
 }: FileTreeViewProps) {
   const expandedPaths = useExplorerStore((s) => s.expandedPaths);
   const selectedPath = useExplorerStore((s) => s.selectedPath);
@@ -137,6 +151,10 @@ export function FileTreeView({
     await renameExplorerNode(oldPath, newPath);
   }, []);
 
+  const handleMove = useCallback(async (sourcePath: string, targetDirPath: string) => {
+    await moveExplorerNode(sourcePath, targetDirPath);
+  }, []);
+
   const renderNodes = (nodes: FileNode[], depth: number): React.ReactNode[] => {
     const items: React.ReactNode[] = [];
 
@@ -162,6 +180,11 @@ export function FileTreeView({
           onNewFolder={handleNewFolder}
           onCopyPath={onCopyPath}
           onOpenInSystemExplorer={onOpenInSystemExplorer}
+          onMove={handleMove}
+          clipboardHasPaste={clipboardHasPaste}
+          onPasteToDir={onPasteToDir}
+          onCheckClipboard={onCheckClipboard}
+          onCopyFile={onCopyFile}
         />,
       );
 
@@ -195,7 +218,7 @@ export function FileTreeView({
   }
 
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={(open) => { if (open) onCheckClipboard?.(); }}>
       <ContextMenuTrigger asChild>
         <div role="tree" className="flex-1 overflow-auto py-0.5">
           {pendingNew && pendingNew.parentPath === rootPath && (
@@ -218,6 +241,12 @@ export function FileTreeView({
         <ContextMenuContent className="w-48">
           <ContextMenuItem onClick={() => handleNewFile(rootPath)}>新建文件</ContextMenuItem>
           <ContextMenuItem onClick={() => handleNewFolder(rootPath)}>新建文件夹</ContextMenuItem>
+          {clipboardHasPaste && onPasteToDir && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem onClick={() => onPasteToDir(rootPath)}>粘贴</ContextMenuItem>
+            </>
+          )}
         </ContextMenuContent>
       )}
     </ContextMenu>

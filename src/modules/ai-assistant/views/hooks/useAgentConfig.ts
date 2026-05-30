@@ -12,6 +12,7 @@ import { useWorkspaceStore } from '../../../../store/workspace-store';
 import {
   buildFileContext,
   buildFileTreeContext,
+  buildMemoryContext,
   buildTopSymbolsContext,
   buildWorkspaceContext,
 } from '../file-context-builder';
@@ -164,6 +165,13 @@ export function useAgentConfig({
 
       let fullInstructions = baseInstructions;
 
+      const wsId = useWorkspaceStore.getState().workspaceId ?? '';
+      const [memoryCtx, fileTreeCtx, symbolCtx] = await Promise.all([
+        buildMemoryContext(wsRoot, wsId),
+        buildFileTreeContext(wsRoot),
+        buildTopSymbolsContext(wsRoot),
+      ]);
+
       const { context: fileCtx } = buildFileContext(
         useFileBufferStore.getState().buffers,
         activeFilePath,
@@ -177,11 +185,8 @@ export function useAgentConfig({
         dirtyFiles: Object.values(buffers).filter((b) => b.isModified).map((b) => b.filePath),
       });
 
-      const [fileTreeCtx, symbolCtx] = await Promise.all([
-        buildFileTreeContext(wsRoot),
-        buildTopSymbolsContext(wsRoot),
-      ]);
-
+      // 注入顺序：项目记忆约束（最高优先级）→ 工作区 → 文件树 → 符号 → 文件内容
+      if (memoryCtx) fullInstructions += `\n\n${memoryCtx}`;
       if (wsCtx) fullInstructions += `\n\n${wsCtx}`;
       if (fileTreeCtx) fullInstructions += `\n\n${fileTreeCtx}`;
       if (symbolCtx) fullInstructions += `\n\n${symbolCtx}`;
